@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/Whuichenggong/urlshortener/urlshortener/internal/model"
@@ -11,20 +12,31 @@ import (
 
 // 生成短url
 type ShortCodeGenerator interface {
-	GenerateIdShortCode() string
+	GenerateShortCode() string
 }
 
 // 只要实现了接口这个方法 随便执行插拔
 type Cache interface {
 	SetURL(ctx context.Context, url repo.Url) error
+	GetURL(ctx context.Context, shortCode string) (*repo.Url, error)
 }
 
 type UrlService struct {
 	querier            repo.Querier
 	shortCodeGenerator ShortCodeGenerator
-	defaultDuration    time.Duration
+	defaultDuration    time.Duration //时间有效期
 	cache              Cache
 	baseURL            string // "http://localhost:8080"
+}
+
+func NewURLService(db *sql.DB, shortCodeGenerator ShortCodeGenerator, duration time.Duration, cache Cache, baseURL string) *UrlService {
+	return &UrlService{
+		querier:            repo.New(db),
+		shortCodeGenerator: shortCodeGenerator,
+		defaultDuration:    duration,
+		cache:              cache,
+		baseURL:            baseURL,
+	}
 }
 
 // 有了接口s *UrlService 只需要这一个实例实现接口方法
@@ -64,7 +76,7 @@ func (s *UrlService) CreateURL(ctx context.Context, req model.CreateURLRequest) 
 	} else {
 		expiredAt = time.Now().Add(time.Hour * time.Duration(*req.Duration))
 	}
-	//插入数据库
+	//插入数据库 把整个信息返回
 	url, err := s.querier.CreateURL(ctx, repo.CreateURLParams{
 		OriginalUrl: req.OriginnalURL,
 		ShortCode:   shortCode,
@@ -80,19 +92,43 @@ func (s *UrlService) CreateURL(ctx context.Context, req model.CreateURLRequest) 
 		return nil, err
 	}
 
-	// 返回响应
+	// 返回响应重新
 	return &model.CreateURLResponse{
 		ShortURL: s.baseURL + "/" + url.ShortCode,
 		ExpireAt: url.ExpiredAt,
 	}, nil
 }
 
-// 对数据库进行操作传入Context
+// 先访问缓存查询结果如果有直接返回
+func (s *UrlService) GetURL(ctx context.Context, shortCode string) (string, error) {
+	//先访问cache
+	url, err := s.cache.GetURL(ctx, shortCode)
+	if err != nil {
+		return "", err
+	} //说明去除了URL
+	if url != nil {
+		return url.OriginalUrl, nil
+	}
+
+	//访问数据库
+	url2, err := s.querier.GetUrlByShortCode(ctx, shortCode)
+	if err != nil {
+		return "", err
+	}
+
+	//存入缓存
+	if err := s.cache.SetURL(ctx, url2); err != nil {
+		return "", err
+	}
+	return url2.OriginalUrl, nil
+}
+
+// 对数据库进行操作传入Context 只在包内可用
 func (s *UrlService) getShortCode(ctx context.Context, n int) (string, error) {
 	if n > 5 {
 		return "", errors.New("重试过多")
 	}
-	shortCode := s.shortCodeGenerator.GenerateIdShortCode()
+	shortCode := s.shortCodeGenerator.GenerateShortCode()
 
 	isAvailable, err := s.querier.IsShortCodeAvailable(ctx, shortCode)
 	if err != nil {
@@ -104,4 +140,9 @@ func (s *UrlService) getShortCode(ctx context.Context, n int) (string, error) {
 	}
 	//递归调用n+1次 重复机制就是这样
 	return s.getShortCode(ctx, n+1)
+}
+
+// 定期删除 再写一个sql 实现定期 删除url
+func (s *UrlService) DeleteURL(ctx context.Context, shortCode string) error {
+	return s.querier.DeleteURLExpired(ctx)
 }

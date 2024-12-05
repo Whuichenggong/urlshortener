@@ -3,6 +3,7 @@ package shortcode
 import "math/rand"
 
 // GenerateIdShortCode() string
+//生成短url
 
 type ShortCode struct {
 	length int

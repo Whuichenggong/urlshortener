@@ -47,6 +47,36 @@ func (q *Queries) CreateURL(ctx context.Context, arg CreateURLParams) (Url, erro
 	return i, err
 }
 
+const deleteURLExpired = `-- name: DeleteURLExpired :exec
+DELETE FROM urls
+WHERE expired_at <= CURRENT_TIMESTAMP
+`
+
+func (q *Queries) DeleteURLExpired(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteURLExpired)
+	return err
+}
+
+const getUrlByShortCode = `-- name: GetUrlByShortCode :one
+SELECT id, original_url, short_code, is_custom, expired_at, create_at FROM urls
+WHERE short_code = $1
+AND expired_at > CURRENT_TIMESTAMP
+`
+
+func (q *Queries) GetUrlByShortCode(ctx context.Context, shortCode string) (Url, error) {
+	row := q.db.QueryRowContext(ctx, getUrlByShortCode, shortCode)
+	var i Url
+	err := row.Scan(
+		&i.ID,
+		&i.OriginalUrl,
+		&i.ShortCode,
+		&i.IsCustom,
+		&i.ExpiredAt,
+		&i.CreateAt,
+	)
+	return i, err
+}
+
 const isShortCodeAvailable = `-- name: IsShortCodeAvailable :one
 SELECT NOT EXISTS(
     SELECT 1 FROM urls
