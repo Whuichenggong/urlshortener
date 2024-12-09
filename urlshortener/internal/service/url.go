@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Whuichenggong/urlshortener/urlshortener/internal/model"
@@ -20,6 +21,7 @@ type ShortCodeGenerator interface {
 type Cache interface {
 	SetURL(ctx context.Context, url repo.Url) error
 	GetURL(ctx context.Context, shortCode string) (*repo.Url, error)
+	DeleteURL(ctx context.Context, code string) error
 }
 
 type UrlService struct {
@@ -38,6 +40,22 @@ func NewURLService(db *sql.DB, shortCodeGenerator ShortCodeGenerator, duration t
 		cache:              cache,
 		baseURL:            baseURL,
 	}
+}
+
+func (s *UrlService) DeleteURL(ctx context.Context, shortCode string) error {
+	result, err := s.querier.DeleteUrlByShortCode(ctx, shortCode)
+	if err != nil {
+		log.Printf("删除失败,数据库中没有这个短url: %v", err)
+	}
+	if result == 0 {
+		return errors.New("数据库中没有这个短url")
+	}
+
+	//删除缓存
+	s.cache.DeleteURL(ctx, shortCode)
+
+	return nil
+
 }
 
 // 有了接口s *UrlService 只需要这一个实例实现接口方法

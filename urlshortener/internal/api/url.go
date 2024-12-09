@@ -20,6 +20,8 @@ type URLService interface {
 	CreateURL(ctx context.Context, req model.CreateURLRequest) (*model.CreateURLResponse, error)
 	//根据短 URL 重定向原始URL
 	GetURL(ctx context.Context, shortCode string) (string, error)
+	//用户可以删除自己的短URL
+	DeleteURL(ctx context.Context, shortCode string) error
 }
 
 //根据需求开发商编写api
@@ -61,7 +63,8 @@ func (h *URLHandler) CreateURL(ctx *gin.Context) {
 // GET /:code 把短URL重定向到长URL
 
 func (h *URLHandler) RedirectURL(ctx *gin.Context) {
-	// 获取短码
+	// 获取短码 这是从前端路由中获取 你对应的路由也应该是/:shortCodef否则将会报错
+
 	shortCode := ctx.Param("shortCode")
 
 	// 调用业务函数获取原始 URL
@@ -80,4 +83,14 @@ func (h *URLHandler) RedirectURL(ctx *gin.Context) {
 
 	// 执行重定向
 	ctx.Redirect(http.StatusFound, originalURL) // 302 临时重定向
+}
+
+func (h *URLHandler) DeleteURL(ctx *gin.Context) {
+	shortcode := ctx.Params.ByName("shortCode")
+	err := h.urlService.DeleteURL(ctx.Request.Context(), shortcode)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"message": "URL deleted successfully"})
 }

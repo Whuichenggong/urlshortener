@@ -17,8 +17,8 @@ const createURL = `-- name: CreateURL :one
     is_custom,
     expired_at
 ) VALUES (
-                 $1, $2, $3,$4
-             ) RETURNING id, original_url, short_code, is_custom, expired_at, create_at
+ $1, $2, $3,$4
+ ) RETURNING id, original_url, short_code, is_custom, expired_at, create_at
 `
 
 type CreateURLParams struct {
@@ -55,6 +55,19 @@ WHERE expired_at <= CURRENT_TIMESTAMP
 func (q *Queries) DeleteURLExpired(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, deleteURLExpired)
 	return err
+}
+
+const deleteUrlByShortCode = `-- name: DeleteUrlByShortCode :execrows
+DELETE FROM urls
+WHERE short_code = $1
+`
+
+func (q *Queries) DeleteUrlByShortCode(ctx context.Context, shortCode string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUrlByShortCode, shortCode)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getUrlByShortCode = `-- name: GetUrlByShortCode :one

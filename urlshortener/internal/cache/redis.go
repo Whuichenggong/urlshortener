@@ -60,3 +60,7 @@ func (c *RedisCache) GetURL(ctx context.Context, code string) (*repo.Url, error)
 func (c *RedisCache) Close() error {
 	return c.client.Close()
 }
+
+func (c *RedisCache) DeleteURL(ctx context.Context, code string) error {
+	return c.client.Del(ctx, code).Err()
+}

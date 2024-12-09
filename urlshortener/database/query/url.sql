@@ -24,3 +24,7 @@ AND expired_at > CURRENT_TIMESTAMP;
 -- name: DeleteURLExpired :exec
 DELETE FROM urls
 WHERE expired_at <= CURRENT_TIMESTAMP;
+
+-- name: DeleteUrlByShortCode :execrows
+DELETE FROM urls
+WHERE short_code = $1;

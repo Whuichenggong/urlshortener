@@ -65,6 +65,7 @@ func (a *Application) Init(filePath string) error {
 
 	g.POST("/api/url/", a.urlHandler.CreateURL)
 	g.GET("/:shortCode/", a.urlHandler.RedirectURL)
+	g.POST("/api/url/:shortCode", a.urlHandler.DeleteURL)
 	a.g = g
 	return nil
 }
