@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/Whuichenggong/urlshortener/urlshortener/internal/model"
 	"github.com/Whuichenggong/urlshortener/urlshortener/internal/repo"
-	"time"
 )
 
 // 生成短url
@@ -140,9 +141,4 @@ func (s *UrlService) getShortCode(ctx context.Context, n int) (string, error) {
 	}
 	//递归调用n+1次 重复机制就是这样
 	return s.getShortCode(ctx, n+1)
-}
-
-// 定期删除 再写一个sql 实现定期 删除url
-func (s *UrlService) DeleteURL(ctx context.Context, shortCode string) error {
-	return s.querier.DeleteURLExpired(ctx)
 }

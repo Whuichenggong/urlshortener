@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"strings"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -28,7 +29,7 @@ type DatabaseConfig struct {
 	MaxOpenConns int    `mapstructure:"max_open_conns"` //最大开放的连接
 }
 
-func LodeConfig(filePath string) (*Config, error) {
+func LoadConfig(filePath string) (*Config, error) {
 	viper.SetConfigFile(filePath)
 
 	viper.SetEnvPrefix("URL_SHORTENER")

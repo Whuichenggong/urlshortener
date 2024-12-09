@@ -3,9 +3,10 @@ package api
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/Whuichenggong/urlshortener/urlshortener/internal/model"
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
 //业务功能
@@ -45,15 +46,16 @@ func (h *URLHandler) CreateURL(ctx *gin.Context) {
 	}
 	//验证数据格式 校验器 判断传进来的json
 	// 如果验证成功，可以继续执行其他操作
-	ctx.JSON(http.StatusOK, gin.H{"message": "Account created successfully!"})
+	//ctx.JSON(http.StatusOK, gin.H{"message": "Account created successfully!"})
 	//调用业务函数
-	resq, err := h.urlService.CreateURL(ctx, req)
+	resp, err := h.urlService.CreateURL(ctx.Request.Context(), req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, err.Error())
+		return
 	}
 
-	//响应
-	ctx.JSON(http.StatusOK, resq)
+	// 返回响应
+	ctx.JSON(http.StatusCreated, resp)
 }
 
 // GET /:code 把短URL重定向到长URL

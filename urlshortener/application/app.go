@@ -1,8 +1,16 @@
 package application
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/Whuichenggong/urlshortener/urlshortener/config"
 	"github.com/Whuichenggong/urlshortener/urlshortener/database"
 	"github.com/Whuichenggong/urlshortener/urlshortener/internal/api"
@@ -23,7 +31,7 @@ type Application struct {
 }
 
 func (a *Application) Init(filePath string) error {
-	cfg, err := config.LodeConfig(filePath)
+	cfg, err := config.LoadConfig(filePath)
 	if err != nil {
 		return fmt.Errorf("加载配置错误: %v", err)
 	}
@@ -44,18 +52,56 @@ func (a *Application) Init(filePath string) error {
 	a.urlService = service.NewURLService(db, a.shortCodeGenerator, cfg.APP.DefaultDuration, redisClient, cfg.APP.BaseURL)
 
 	a.urlHandler = api.NewURLHandler(a.urlService)
-	g := gin.New()
-	a.g = g
 
-	g.POST("api/url", a.urlHandler.CreateURL)
-	g.GET("/:code", a.urlHandler.RedirectURL)
+	// 添加中间件
+	g := gin.New()
+	g.Use(gin.Logger())
+	g.Use(gin.Recovery())
+	g.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		c.Next()
+	})
+
+	g.POST("/api/url/", a.urlHandler.CreateURL)
+	g.GET("/:shortCode/", a.urlHandler.RedirectURL)
 	a.g = g
 	return nil
 }
 
-func (a *Application) RunServer() {
-	err := a.g.Run(":8080")
-	if err != nil {
-		panic(err)
+// 修改 RunServer 方法，支持优雅关闭
+func (a *Application) RunServer() error {
+	server := &http.Server{
+		Addr:         a.cfg.Server.Addr,
+		Handler:      a.g,
+		ReadTimeout:  a.cfg.Server.ReadTimeout,
+		WriteTimeout: a.cfg.Server.WriteTimeout,
+	}
+
+	// 优雅关闭
+	go func() {
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		a.Close() // 清理资源
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("Server forced to shutdown: %v\n", err)
+		}
+	}()
+
+	return server.ListenAndServe()
+}
+
+// 修改 application/app.go
+func (a *Application) Close() {
+	if a.db != nil {
+		a.db.Close()
+	}
+	if a.redisClient != nil {
+		a.redisClient.Close()
 	}
 }

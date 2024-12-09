@@ -10,7 +10,7 @@ database:
   max_open_conns: 5
 
 redis:
-  add: "http://localhsot:6379"
+  address: "localhost:6379"
   password: ""
   db: 0
 
